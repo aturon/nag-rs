@@ -1,0 +1,16 @@
+[package]
+name = "nag-rs"
+version = "0.1.0"
+authors = ["Aaron Turon <aturon@mozilla.com>"]
+
+[dependencies]
+hyper = "0.10"
+hyper-openssl = "0.2"
+hubcaps = { path = "/Users/aturon/moz/hubcaps" }
+chrono = "0.3.0"
+rand = "0.3.15"
+reqwest = "0.4.0"
+serde = "0.9"
+serde_derive = "0.9"
+docopt = "0.7"
+error-chain = "0.9"
