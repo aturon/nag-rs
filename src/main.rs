@@ -13,7 +13,7 @@ extern crate error_chain;
 extern crate serde_derive;
 
 use std::fs::File;
-use std::io::{self, BufRead, BufReader, Write};
+use std::io::{self, Read, BufRead, BufReader, Write};
 use std::process::{Command, Stdio};
 use std::fmt;
 
@@ -230,14 +230,19 @@ fn send_email(member: &TeamMember, items: Vec<Item>) -> Result<()> {
     Ok(())
 }
 
-fn run(dry_run: bool, token: &str, input_file: &str) -> Result<()> {
+fn run(dry_run: bool, token_file: &str, input_file: &str) -> Result<()> {
+    let mut token = String::new();
+    File::open(token_file)
+        .chain_err(|| format!("couldn't open token file {}", token_file))?
+        .read_to_string(&mut token)?;
+
     let ssl = OpensslClient::new().chain_err(|| "couldn't set up SSL")?;
     let connector = HttpsConnector::new(ssl);
     let client = Client::with_connector(connector);
     let github = Github::new(
         "nag-rs",
         client,
-        Credentials::Token(token.to_owned())
+        Credentials::Token(token)
     );
 
     let rust = github.repo("rust-lang", "rust");
