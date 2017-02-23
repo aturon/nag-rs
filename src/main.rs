@@ -193,12 +193,12 @@ This email contains your reviewing mission for today.
     const RAND_COUNT: usize = 2;
 
     if items.len() > STALE_COUNT + RAND_COUNT {
-        writeln!(f, "<p><b>Three stalest items:</b>")?;
+        writeln!(f, "<p><b>Stale items:</b>")?;
         for item in items.drain(..STALE_COUNT) {
             writeln!(f, "{}", item)?
         }
 
-        writeln!(f, "<p><b>Three random items:</b>")?;
+        writeln!(f, "<p><b>Random items:</b>")?;
         for _ in 0..RAND_COUNT {
             let len = items.len();
             if len == 0 { break; }
