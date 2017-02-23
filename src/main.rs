@@ -149,8 +149,9 @@ impl TeamMember {
         let list: FcpList = resp.json()?;
         items.extend(list.1.iter().map(Item::from_fcp));
 
-        items.sort_by_key(|item| item.number);
-        items.dedup_by_key(|item| item.number);
+        // wait until Rust 1.16
+        //items.sort_by_key(|item| item.number);
+        //items.dedup_by_key(|item| item.number);
         items.sort_by_key(|item| item.last_update);
 
         Ok(items)
@@ -188,14 +189,17 @@ This email contains your reviewing mission for today.
                  from="nagbot@rust-lang.org",
                  to=member.email)?;
 
-    if items.len() > 6 {
+    const STALE_COUNT: usize = 3;
+    const RAND_COUNT: usize = 2;
+
+    if items.len() > STALE_COUNT + RAND_COUNT {
         writeln!(f, "<p><b>Three stalest items:</b>")?;
-        for item in items.drain(..3) {
+        for item in items.drain(..STALE_COUNT) {
             writeln!(f, "{}", item)?
         }
 
         writeln!(f, "<p><b>Three random items:</b>")?;
-        for _ in 0..3 {
+        for _ in 0..RAND_COUNT {
             let len = items.len();
             if len == 0 { break; }
             let item = items.swap_remove(rand::random::<usize>() % len);
