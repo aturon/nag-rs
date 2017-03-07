@@ -23,9 +23,10 @@ use hyper_openssl::OpensslClient;
 
 use hubcaps::{Credentials, Github};
 use hubcaps::repositories::Repository;
-use hubcaps::rep::{IssueListOptionsBuilder, Issue};
+use hubcaps::issues::{IssueListOptionsBuilder, Issue};
+use hubcaps::comments::{CommentListOptionsBuilder, Comments};
 
-use chrono::{DateTime, UTC};
+use chrono::{Duration, DateTime, UTC};
 
 use docopt::Docopt;
 
@@ -69,13 +70,14 @@ struct FcpUser {
 #[derive(Debug, Deserialize)]
 struct FcpList(FcpUser, Vec<FcpItem>);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Kind {
     FCP,
     RFC,
     PR,
 }
 
+#[derive(Clone)]
 struct Item {
     number: u64,
     kind: Kind,
@@ -85,7 +87,7 @@ struct Item {
 }
 
 impl Item {
-    fn from_issue(issue: &Issue, kind: Kind) -> Item {
+    fn from_issue(issue: Issue, kind: Kind) -> Item {
         Item {
             number: issue.number,
             kind: kind,
@@ -112,9 +114,26 @@ impl Item {
 
 impl fmt::Display for Item {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "<p>{:?}: <a href={}>{}</a><br>Last update: {}",
-               self.kind, self.url, self.title, self.last_update.date().format("%Y-%m-%d"))
+        write!(f, "<p>{} {:?}: <a href={}>{}</a>",
+               self.last_update.date().format("%Y-%m-%d"), self.kind, self.url, self.title)
     }
+}
+
+fn filter_issue(github: &Github, repo: &str, login: &str, issue: &Issue) -> bool {
+    if issue.labels.iter().any(|label| label.name == "final-comment-period") {
+        return false;
+    }
+
+    let filter = CommentListOptionsBuilder::new()
+        .since(format!("{}", UTC::now().checked_sub_signed(Duration::weeks(1)).unwrap().format("%Y-%m-%d")))
+        .build();
+    let comments = Comments::new(github, "rust-lang", repo, issue.number)
+        .list(&filter).unwrap();
+    if comments.into_iter().any(|comment| comment.user.login == login) {
+        return false;
+    }
+
+    true
 }
 
 #[derive(Clone)]
@@ -124,12 +143,13 @@ struct TeamMember {
 }
 
 impl TeamMember {
-    fn items(&self, rust: &Repository, rfcs: &Repository) -> Result<Vec<Item>> {
+    fn items(&self, github: &Github, rust: &Repository, rfcs: &Repository) -> Result<Vec<Item>> {
         let filter = IssueListOptionsBuilder::new()
             .assignee(&self.login[..])
             .build();
         let mut items: Vec<Item> = rust.issues().list(&filter)?
-            .iter()
+            .into_iter()
+            .filter(|issue| filter_issue(github, "rust", &self.login, issue))
             .map(|issue| Item::from_issue(issue, Kind::PR))
             .filter(|item| item.url.contains("pull"))
             .collect();
@@ -138,7 +158,8 @@ impl TeamMember {
             .assignee(&self.login[..])
             .build();
         items.extend(rfcs.issues().list(&filter)?
-                     .iter()
+                     .into_iter()
+                     .filter(|issue| filter_issue(github, "rfcs", &self.login, issue))
                      .map(|issue| Item::from_issue(issue, Kind::RFC))
                      .filter(|item| item.url.contains("pull")));
 
@@ -157,8 +178,8 @@ impl TeamMember {
         Ok(items)
     }
 
-    fn process(&self, dry_run: bool, rust: &Repository, rfcs: &Repository) -> Result<()> {
-        let items = self.items(rust, rfcs)?;
+    fn process(&self, dry_run: bool, github: &Github, rust: &Repository, rfcs: &Repository) -> Result<()> {
+        let items = self.items(github, rust, rfcs)?;
         if !items.is_empty() {
             if dry_run {
                 write_email(&mut io::stdout(), self, items)
@@ -193,6 +214,8 @@ This email contains your reviewing mission for today.
     const RAND_COUNT: usize = 2;
 
     if items.len() > STALE_COUNT + RAND_COUNT {
+        let full_list = items.clone();
+
         writeln!(f, "<p><b>Stale items:</b>")?;
         for item in items.drain(..STALE_COUNT) {
             writeln!(f, "{}", item)?
@@ -205,6 +228,12 @@ This email contains your reviewing mission for today.
             let item = items.swap_remove(rand::random::<usize>() % len);
             writeln!(f, "{}", item)?
         }
+
+        writeln!(f, "<hr/><p><b>Full list</b>: <details>")?;
+        for item in full_list {
+            writeln!(f, "{}", item)?
+        }
+        writeln!(f, "</details>")?;
     } else {
         writeln!(f, "<p><b>All items:</b>")?;
         for item in items {
@@ -258,7 +287,7 @@ fn run(dry_run: bool, token_file: &str, input_file: &str) -> Result<()> {
             email: line_iter.next().ok_or("malformed input")?.to_owned(),
         };
 
-        print_if_err(member.process(dry_run, &rust, &rfcs),
+        print_if_err(member.process(dry_run, &github, &rust, &rfcs),
                      &format!("error for {}", member.login));
     }
 

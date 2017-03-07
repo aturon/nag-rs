@@ -6,7 +6,7 @@ authors = ["Aaron Turon <aturon@mozilla.com>"]
 [dependencies]
 hyper = "0.10"
 hyper-openssl = "0.2"
-hubcaps = { git = "https://github.com/aturon/hubcaps", branch = "update-hyper" }
+hubcaps = "0.3"
 chrono = "0.3.0"
 rand = "0.3.15"
 reqwest = "0.4.0"
