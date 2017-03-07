@@ -214,8 +214,6 @@ This email contains your reviewing mission for today.
     const RAND_COUNT: usize = 2;
 
     if items.len() > STALE_COUNT + RAND_COUNT {
-        let full_list = items.clone();
-
         writeln!(f, "<p><b>Stale items:</b>")?;
         for item in items.drain(..STALE_COUNT) {
             writeln!(f, "{}", item)?
@@ -228,12 +226,6 @@ This email contains your reviewing mission for today.
             let item = items.swap_remove(rand::random::<usize>() % len);
             writeln!(f, "{}", item)?
         }
-
-        writeln!(f, "<hr/><p><b>Full list</b>: <details>")?;
-        for item in full_list {
-            writeln!(f, "{}", item)?
-        }
-        writeln!(f, "</details>")?;
     } else {
         writeln!(f, "<p><b>All items:</b>")?;
         for item in items {
