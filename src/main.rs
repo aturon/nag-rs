@@ -163,7 +163,7 @@ impl TeamMember {
                      .map(|issue| Item::from_issue(issue, Kind::RFC))
                      .filter(|item| item.url.contains("pull")));
 
-        let mut url = String::from("http://rusty-dash.com/api/fcp/");
+        let mut url = String::from("http://rusty-dash.com/api/");
         url.push_str(&self.login);
 
         let mut resp = reqwest::get(&url)?;
